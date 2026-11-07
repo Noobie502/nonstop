@@ -151,3 +151,14 @@ footer a { color: var(--muted); }
 .al-planes { color: var(--muted); font-size: 12px; margin: 2px 0 0 28px; }
 .rp-foot { margin-top: 8px; font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .leaflet-container .rp-foot a, .rp-foot a { color: var(--amber); font-size: 12px; }
+
+#data-date { color: var(--text); }
+.route-pop .rp-list { max-height: 260px; }
+.leaflet-popup-content { min-width: 300px; }
+table.fl { width: 100%; border-collapse: collapse; margin: 3px 0 0; font-size: 12px; }
+table.fl td { padding: 2px 4px 2px 0; vertical-align: top; }
+table.fl .fn { font: 600 12px var(--mono); color: var(--text); white-space: nowrap; width: 1%; }
+table.fl .tm { font: 600 12px var(--mono); color: var(--amber); white-space: nowrap; width: 1%; }
+table.fl .ty { color: var(--muted); }
+table.fl .dy { font: 500 11px var(--mono); color: var(--muted); text-align: right; white-space: nowrap; width: 1%; }
+.al-row .al-planes { margin-left: 0; }

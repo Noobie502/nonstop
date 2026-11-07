@@ -1,7 +1,8 @@
 (() => {
   "use strict";
   const HUBS = ["FRA", "ATL", "DXB", "SIN", "BKK", "LHR", "IST", "LAX", "SYD", "GRU"];
-  const AIRLINE_PICKS = ["Emirates", "Ryanair", "Singapore Airlines", "Southwest Airlines", "Qantas", "AirAsia"];
+  const AIRLINE_PICKS = ["EK", "FR", "SQ", "WN", "QF", "TG", "LH", "AK"];
+  const VER = 3;
   const R = 6371;
   const COPIES = [-360, 0, 360];
   const rad = (d) => (d * Math.PI) / 180;
@@ -10,9 +11,10 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   // network data
-  let A = [], AL = [], PL = [], ROUTES = [];
+  let A = [], AL = [], ROUTES = [], META = {}, TYPES = null;
   const byCode = new Map();     // IATA -> airport index
-  const pairMap = new Map();    // s*10000+d -> [[airline, codeshare, ...planes], ...]
+  const pairMap = new Map();    // s*10000+d -> { min: scheduled minutes, als: [airline idx] }
+  const detailCache = new Map(); // IATA -> Promise of { destIATA: [[airline, source, data], ...] }
   let alPairs = [];             // airline -> [[s, d], ...] (directed)
   let alAirportCount = [];      // airline -> number of airports served
   let view = null;              // { mode: "airport"|"airline", ... }
@@ -29,6 +31,9 @@
   const dotRenderer = L.canvas({ padding: 0.5, tolerance: 3 });
   const routeRenderer = L.canvas({ padding: 0.5, tolerance: 6 });
   const baseLayer = L.layerGroup().addTo(map);
+  let openPopup = null;
+  map.on("popupopen", (e) => { openPopup = e.popup; });
+  map.on("popupclose", () => { openPopup = null; });
   const routeLayer = L.layerGroup().addTo(map);
 
   // ---------- geo ----------
@@ -78,18 +83,19 @@
     }).addTo(map));
   }).catch(() => {});
 
-  fetch("data/network.json?v=2").then((r) => r.json()).then((data) => {
-    A = data.airports; AL = data.airlines; PL = data.planes; ROUTES = data.routes;
+  fetch(`data/network.json?v=${VER}`).then((r) => r.json()).then((data) => {
+    A = data.airports; AL = data.airlines; ROUTES = data.routes; META = data.meta || {};
     A.forEach((a, i) => byCode.set(a[0], i));
     alPairs = AL.map(() => []);
     const served = AL.map(() => new Set());
-    ROUTES.forEach((list, s) => list.forEach(([d, ...als]) => {
-      pairMap.set(s * 10000 + d, als);
-      als.forEach(([al]) => { alPairs[al].push([s, d]); served[al].add(s); served[al].add(d); });
+    ROUTES.forEach((list, s) => list.forEach(([d, min, ...als]) => {
+      pairMap.set(s * 10000 + d, { min, als });
+      als.forEach((al) => { alPairs[al].push([s, d]); served[al].add(s); served[al].add(d); });
     }));
     alAirportCount = served.map((s) => s.size);
     drawBase();
     buildIntro();
+    showMeta();
     $("loading").remove();
     if (!fromHash()) map.setView([25, 20], 2);
   }).catch(() => { $("loading").textContent = "Couldn't load route data. Try refreshing."; });
@@ -120,8 +126,10 @@
       hubs.appendChild(b);
     });
     const als = $("airline-chips");
-    AIRLINE_PICKS.forEach((name) => {
-      const i = AL.findIndex((a) => a[0] === name);
+    AIRLINE_PICKS.forEach((code) => {
+      const i = findAirline(code);
+      if (i === undefined) return;
+      const name = AL[i][0];
       if (i < 0) return;
       const b = document.createElement("button");
       b.textContent = AL[i][1] || name;
@@ -162,7 +170,7 @@
   // ---------- airport view ----------
   function selectAirport(i, airline = null) {
     const o = A[i];
-    const dests = ROUTES[i].map(([d, ...als]) => ({ i: d, a: A[d], km: Math.round(distKm(o, A[d])), als }))
+    const dests = ROUTES[i].map(([d, min, ...als]) => ({ i: d, a: A[d], km: Math.round(distKm(o, A[d])), min, als }))
       .sort((x, y) => x.km - y.km);
     view = { mode: "airport", i, o, dests };
     document.title = `${o[0]} nonstop — where can I fly direct?`;
@@ -173,7 +181,7 @@
 
     // airline filter options, busiest first
     const counts = new Map();
-    dests.forEach((d) => d.als.forEach(([al]) => counts.set(al, (counts.get(al) || 0) + 1)));
+    dests.forEach((d) => d.als.forEach((al) => counts.set(al, (counts.get(al) || 0) + 1)));
     const sel = $("al-filter");
     sel.innerHTML = `<option value="">All airlines (${counts.size})</option>` +
       [...counts].sort((x, y) => y[1] - x[1])
@@ -194,7 +202,7 @@
     const alF = $("al-filter").value === "" ? null : +$("al-filter").value;
     $("dist-out").textContent = `${maxKm.toLocaleString()} km`;
     setHash(o[0] + (alF != null ? "/" + alKey(alF) : ""));
-    const shown = dests.filter((d) => d.km <= maxKm && (!intl || d.a[3] !== o[3]) && (alF == null || d.als.some(([al]) => al === alF)));
+    const shown = dests.filter((d) => d.km <= maxKm && (!intl || d.a[3] !== o[3]) && (alF == null || d.als.includes(alF)));
 
     $("s-dest").textContent = shown.length;
     $("s-countries").textContent = new Set(shown.map((d) => d.a[3])).size;
@@ -324,47 +332,84 @@
     }
   }
 
-  // ---------- route popup: airlines, aircraft, schedules ----------
+  // ---------- route popup: airlines, flights, aircraft, takeoff times ----------
+  const fmtMin = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const fmtDur = (m) => `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+  function loadTypes() {
+    if (!TYPES) TYPES = fetch(`data/types.json?v=${VER}`).then((r) => r.json());
+    return TYPES;
+  }
+  function loadDetail(code) {
+    if (!detailCache.has(code)) {
+      detailCache.set(code, Promise.all([fetch(`data/detail/${code}.json?v=${VER}`).then((r) => r.json()), loadTypes()])
+        .then(([det, types]) => ({ det, types }))
+        .catch(() => { detailCache.delete(code); return null; }));
+    }
+    return detailCache.get(code);
+  }
+
   function routePopup(s, d, focusAl) {
     const o = A[s], t = A[d];
-    const als = (pairMap.get(s * 10000 + d) || []).slice()
-      .sort((x, y) => (y[0] === focusAl) - (x[0] === focusAl) || x[1] - y[1] || AL[x[0]][0].localeCompare(AL[y[0]][0]));
+    const info = pairMap.get(s * 10000 + d) || { min: 0, als: [] };
     const km = Math.round(distKm(o, t));
     const back = pairMap.has(d * 10000 + s);
     const gf = (extra = "") => `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights from ${o[0]} to ${t[0]}${extra}`)}`;
-
-    const rows = als.map(([al, cs, ...planes]) => {
-      const a = AL[al];
-      const types = planes.map((p) => PL[p][1] || PL[p][0]);
-      return `<div class="al-row${al === focusAl ? " focus" : ""}">
-        <div class="al-top">
-          <span class="al-code">${esc(a[1] || "··")}</span>
-          <span class="al-name">${esc(a[0])}</span>
-          ${cs ? '<span class="tag" title="Sold under this airline\'s code, flown by a partner">codeshare</span>' : ""}
-          <a class="al-sched" href="${gf(" on " + a[0])}" target="_blank" rel="noopener" title="Live schedules on Google Flights">times ↗</a>
-        </div>
-        <div class="al-planes">${types.length ? types.map(esc).join(" · ") : "Aircraft not listed"}</div>
-      </div>`;
-    }).join("");
+    const days = (META.observedDays || []).length;
 
     const div = document.createElement("div");
     div.className = "route-pop";
     div.innerHTML = `
       <div class="rp-head"><b>${o[0]}</b><span class="rp-arrow">✈</span><b>${t[0]}</b></div>
       <div class="rp-sub">${esc(o[2])} → ${esc(t[2])}, ${esc(t[3])}</div>
-      <div class="rp-meta">${km.toLocaleString()} km · ~${blockTime(km)} · ${back ? "return route ✓" : "one-way in data"}</div>
-      <div class="rp-label">Who flies it · on what</div>
-      <div class="rp-list">${rows || '<div class="al-planes">No airline data</div>'}</div>
+      <div class="rp-meta">${km.toLocaleString()} km · ${info.min ? fmtDur(info.min) + " scheduled" : "~" + blockTime(km)} · ${back ? "return route ✓" : "one-way"}</div>
+      <div class="rp-label">Who flies it · flights seen · aircraft</div>
+      <div class="rp-list"><div class="al-planes">Loading flights…</div></div>
       <div class="rp-foot">
-        <a href="${gf()}" target="_blank" rel="noopener">Departure times on Google Flights ↗</a>
-        <span>Timetables aren't in the open data, so times come from Google Flights.</span>
+        <a href="${gf()}" target="_blank" rel="noopener">Exact schedules on Google Flights ↗</a>
+        <span>Takeoff times are local and come from tracking ${days ? `over the last ${days} day${days > 1 ? "s" : ""}` : "data"}; departure from the gate is usually 10–25 min earlier.</span>
       </div>`;
     const btn = document.createElement("button");
     btn.className = "pop-btn";
     btn.textContent = `Fly from ${t[0]} →`;
     btn.onclick = () => { map.closePopup(); selectAirport(d); };
     div.querySelector(".rp-head").appendChild(btn);
+
+    loadDetail(o[0]).then((res) => {
+      const list = div.querySelector(".rp-list");
+      const rowsData = res && res.det[t[0]] ? res.det[t[0]] : info.als.map((al) => [al, 0, []]);
+      const types = res ? res.types : [];
+      rowsData.sort((x, y) => (y[0] === focusAl) - (x[0] === focusAl) || (x[1] === 1 ? 0 : 1) - (y[1] === 1 ? 0 : 1) || AL[x[0]][0].localeCompare(AL[y[0]][0]));
+      list.innerHTML = rowsData.map(([al, src, data]) => {
+        const a = AL[al];
+        let body;
+        if (src === 1) {
+          body = `<table class="fl">${data.map(([label, min, n, tys]) => `
+            <tr><td class="fn">${esc(label)}</td><td class="tm">${min >= 0 ? fmtMin(min) : "—"}</td>
+            <td class="ty">${tys.map((x) => esc(types[x])).join(", ")}</td>
+            <td class="dy" title="Seen on ${n} of ${days} days">${n}/${days}d</td></tr>`).join("")}</table>`;
+        } else if (src === 2) {
+          body = `<div class="al-planes"><span class="tag">2014 data</span> ${data.map((x) => esc(types[x])).join(" · ")}</div>`;
+        } else {
+          body = `<div class="al-planes">Not seen in tracking data this week</div>`;
+        }
+        return `<div class="al-row${al === focusAl ? " focus" : ""}">
+          <div class="al-top">
+            <span class="al-code">${esc(a[1] || "··")}</span>
+            <span class="al-name">${esc(a[0])}</span>
+            <a class="al-sched" href="${gf(" on " + a[0])}" target="_blank" rel="noopener" title="Schedules on Google Flights">schedule ↗</a>
+          </div>${body}</div>`;
+      }).join("") || '<div class="al-planes">No airline data</div>';
+      // content grew after loading: let Leaflet re-measure and pan it into view
+      if (openPopup && openPopup.getElement() && openPopup.getElement().contains(div)) { openPopup._updateLayout(); openPopup._updatePosition(); openPopup._adjustPan(); }
+    });
     return div;
+  }
+
+  function showMeta() {
+    const days = META.observedDays || [];
+    if (!days.length && !META.built) return;
+    $("data-date").textContent = `Routes updated ${META.built || "weekly"}` +
+      (days.length ? `; flights tracked ${days[0]} to ${days[days.length - 1]}.` : ".");
   }
 
   // ---------- panel sections ----------

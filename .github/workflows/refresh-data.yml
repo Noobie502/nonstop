@@ -1,0 +1,61 @@
+name: Refresh route & flight data
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"   # Mondays 03:17 UTC (10:17 in Bangkok)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days of flight tracking to include"
+        default: "7"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Processed tracking days are cached, so each run only downloads the new days.
+      - name: Restore processed tracking days
+        uses: actions/cache@v4
+        with:
+          path: data-src/observed
+          key: observed-${{ github.run_id }}
+          restore-keys: observed-
+
+      - name: Download route data
+        run: |
+          mkdir -p data-src/openflights
+          curl -sSfL -o data-src/airline_routes.json \
+            https://raw.githubusercontent.com/Jonty/airline-route-data/main/airline_routes.json
+          for f in airports routes airlines planes; do
+            curl -sSfL -o data-src/openflights/$f.dat \
+              https://raw.githubusercontent.com/jpatokal/openflights/master/data/$f.dat
+          done
+
+      - name: Process flight tracking (adsb.lol)
+        run: scripts/fetch_observed.sh data-src/airline_routes.json data-src/observed "${{ github.event.inputs.days || '7' }}"
+
+      - name: Build site data
+        run: python3 -I scripts/build_data.py data-src/airline_routes.json data-src/observed data-src/openflights public/data
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add -A public/data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Weekly data refresh $(date -u +%Y-%m-%d)"
+          git push
