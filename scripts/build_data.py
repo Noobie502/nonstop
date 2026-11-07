@@ -49,8 +49,11 @@ for r in csv.reader(open(os.path.join(of_dir, "routes.dat"), encoding="utf-8")):
 def pretty_type(desc, code):
     if not desc: return code
     s = re.sub(r"\bA-(\d{3})", r"A\1", desc)
-    s = " ".join(w.capitalize() if w.isalpha() and w.isupper() and len(w) > 3 else w for w in s.split())
-    s = s.replace("Mcdonnell", "McDonnell").replace("De Havilland Canada", "De Havilland")
+    cap = lambda w: "-".join(x.capitalize() if x.isalpha() and x.isupper() and len(x) > 3 else x for x in w.split("-"))
+    s = " ".join(cap(w) for w in s.split())
+    s = re.sub(r"^DE Havilland", "De Havilland", s)
+    s = s.replace("Mcdonnell", "McDonnell").replace("McDonnell-Douglas", "McDonnell Douglas")
+    s = s.replace("De Havilland Canada", "De Havilland")
     return s
 
 obs_files = sorted(glob.glob(os.path.join(obs_dir, "*.json")))
