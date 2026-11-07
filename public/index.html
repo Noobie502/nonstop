@@ -23,17 +23,21 @@
 
     <div class="search">
       <label for="q" class="sr">Search airport</label>
-      <input id="q" type="search" placeholder="Airport, city or code (e.g. SIN)" autocomplete="off" spellcheck="false">
+      <input id="q" type="search" placeholder="Airport, city or airline (e.g. SIN, Qantas)" autocomplete="off" spellcheck="false">
       <ul id="suggest" role="listbox" hidden></ul>
     </div>
 
     <div id="intro">
       <p>Pick an airport to light up every place you can reach without a connection. Or try a big hub:</p>
       <div class="chips" id="hubs"></div>
+      <p>…or map an airline's whole network:</p>
+      <div class="chips" id="airline-chips"></div>
       <button id="random" class="ghost">🎲 Surprise me</button>
+      <p class="tip">Tip: click any route line to see who flies it and on what aircraft.</p>
     </div>
 
     <section id="detail" hidden>
+      <button class="back ghost">← Back</button>
       <div class="origin">
         <div class="code" id="o-code"></div>
         <div>
@@ -53,15 +57,39 @@
           <input id="dist" type="range" min="250" max="20000" step="250" value="20000">
         </label>
         <label class="row"><input type="checkbox" id="intl"> International only</label>
+        <div class="al-pick">
+          <label for="al-filter" class="sr">Airline</label>
+          <select id="al-filter"></select>
+          <button id="al-network" class="ghost" title="Map this airline's whole network">Network ↗</button>
+        </div>
       </div>
 
       <div class="board-head"><span>DEST</span><span>CITY</span><span class="r">KM</span></div>
-      <ol id="list"></ol>
+      <ol id="list" class="board"></ol>
+    </section>
+
+    <section id="airline" hidden>
+      <button class="back ghost">← Back</button>
+      <div class="origin">
+        <div class="code al" id="a-code"></div>
+        <div>
+          <div class="o-name" id="a-name"></div>
+          <div class="o-place" id="a-place"></div>
+        </div>
+      </div>
+      <div class="stats">
+        <div><b id="a-routes">0</b><span>routes</span></div>
+        <div><b id="a-airports">0</b><span>airports</span></div>
+        <div><b id="a-countries">0</b><span>countries</span></div>
+      </div>
+      <p class="tip">Click an airport to see this airline's flights from there.</p>
+      <div class="board-head"><span>APT</span><span>CITY</span><span class="r">ROUTES</span></div>
+      <ol id="a-list" class="board"></ol>
     </section>
 
     <footer>
       Route data: <a href="https://openflights.org/data" target="_blank" rel="noopener">OpenFlights</a> (ODbL), last updated 2014, so some routes have since changed.
-      Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>
+      Map: <a href="https://www.naturalearthdata.com" target="_blank" rel="noopener">Natural Earth</a>.
     </footer>
   </aside>
 
