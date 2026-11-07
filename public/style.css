@@ -162,3 +162,7 @@ table.fl .tm { font: 600 12px var(--mono); color: var(--amber); white-space: now
 table.fl .ty { color: var(--muted); }
 table.fl .dy { font: 500 11px var(--mono); color: var(--muted); text-align: right; white-space: nowrap; width: 1%; }
 .al-row .al-planes { margin-left: 0; }
+
+.origin .code.ac { background: #b9a6ff; font-size: 18px; max-width: 150px; line-height: 1.15; text-align: center; }
+#suggest .c.ac { color: #b9a6ff; }
+.al-pick select:disabled { opacity: .55; }

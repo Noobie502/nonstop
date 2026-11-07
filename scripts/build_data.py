@@ -77,18 +77,21 @@ carriers_of = {(s, r["iata"]): {c["iata"] for c in r["carriers"]}
 label_iata = {}  # callsign -> IATA used for its flight-number label
 
 def resolve(deps, arrs, cs):
-    """Pick the (dep, arr, airline) that is a known route flown by an airline this callsign maps to."""
+    """Pick the (dep, arr, airline) that is a known route flown by an airline this callsign maps to.
+    If nearby airports make it ambiguous (e.g. SYD vs WSI, both served by the airline), skip the flight."""
     cands = icao_map.get(cs[:3])
     if not cands: return None
+    hits = []
     for dep in deps:
         for arr in arrs:
             if dep == arr: continue
             cars = carriers_of.get((dep, arr))
             if not cars: continue
-            for al in cands:
-                if al in cars:
-                    return dep, arr, al, cands[0]
-    return None
+            al = next((a for a in cands if a in cars), None)
+            if al: hits.append((dep, arr, al))
+    if len({(h[0], h[1]) for h in hits}) != 1: return None
+    dep, arr, al = hits[0]
+    return dep, arr, al, cands[0]
 
 loaded = []
 for f in obs_files:
@@ -135,6 +138,26 @@ def flight_label(cs):
     m = re.match(r"^[A-Z]{3}(\d+)$", cs)
     return f"{label_iata.get(cs, cs[:3])} {int(m.group(1))}" if m else cs
 
+# ---------- aircraft families for the filter (airliners only) ----------
+FAMILY_CODES = [
+    ("Airbus A380", "A388"), ("Airbus A350", "A359 A35K"), ("Airbus A340", "A342 A343 A345 A346"),
+    ("Airbus A330neo", "A338 A339"), ("Airbus A330", "A332 A333"), ("Airbus A300/A310", "A306 A30B A310"),
+    ("Airbus A320neo family", "A19N A20N A21N"), ("Airbus A320 family", "A318 A319 A320 A321"),
+    ("Airbus A220", "BCS1 BCS3"),
+    ("Boeing 747", "B742 B743 B744 B748"), ("Boeing 777X", "B778 B779"), ("Boeing 777", "B772 B77L B773 B77W"),
+    ("Boeing 787 Dreamliner", "B788 B789 B78X"), ("Boeing 767", "B762 B763 B764"), ("Boeing 757", "B752 B753"),
+    ("Boeing 737 MAX", "B37M B38M B39M B3XM"), ("Boeing 737 (NG & Classic)", "B732 B733 B734 B735 B736 B737 B738 B739"),
+    ("Boeing 717", "B712"), ("McDonnell Douglas MD-11", "MD11"),
+    ("McDonnell Douglas MD-80/90 & DC-9", "MD81 MD82 MD83 MD87 MD88 MD90 DC91 DC93 DC95"),
+    ("Embraer E-Jet E2", "E290 E295"), ("Embraer E-Jet", "E170 E75L E75S E190 E195"),
+    ("Embraer ERJ-135/145", "E135 E145 E45X"), ("Bombardier CRJ", "CRJ1 CRJ2 CRJ7 CRJ9 CRJX"),
+    ("ATR 42/72", "AT43 AT44 AT45 AT46 AT72 AT73 AT75 AT76"), ("De Havilland Dash 8", "DH8A DH8B DH8C DH8D"),
+    ("COMAC C919", "C919"), ("COMAC ARJ21", "AJ27"), ("Sukhoi Superjet 100", "SU95"),
+    ("Fokker 50/70/100", "F50 F70 F100"), ("BAe 146 / Avro RJ", "B461 B462 B463 RJ70 RJ85 RJ1H"),
+    ("Saab 340/2000", "SF34 SB20"), ("Dornier 328", "D328 J328"), ("De Havilland Twin Otter", "DHC6"),
+]
+FAMILY_OF = {c: name for name, codes in FAMILY_CODES for c in codes.split()}
+
 # ---------- assemble ----------
 used = sorted(k for k, a in ap_ok.items() if a.get("routes"))
 idx = {a: i for i, a in enumerate(used)}
@@ -152,6 +175,7 @@ def tix(name):
     return type_idx[name]
 
 routes = [[] for _ in used]
+fam_pairs = defaultdict(set)  # family -> {(s, d, airline)}
 details = defaultdict(dict)
 stats = Counter()
 for s in used:
@@ -175,6 +199,9 @@ for s in used:
                                  [tix(pretty_type(type_desc.get(t), t)) for t, _ in e["types"].most_common(3)]])
                 rows.sort(key=lambda x: (x[1] if x[1] >= 0 else 9999))
                 det.append([al_idx[a], 1, rows[:14]])
+                for e in fl.values():
+                    for t in e["types"]:
+                        if t in FAMILY_OF: fam_pairs[FAMILY_OF[t]].add((idx[s], idx[d], al_idx[a]))
                 stats["airline_routes_observed"] += 1
             elif (s, d, a) in of2014:
                 det.append([al_idx[a], 2, [tix(n) for n in sorted(of2014[(s, d, a)])]])
@@ -203,6 +230,13 @@ for s, det in details.items():
     json.dump(det,
               open(os.path.join(out, "detail", f"{s}.json"), "w", encoding="utf-8"), separators=(",", ":"))
 json.dump(type_names, open(os.path.join(out, "types.json"), "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+fams = sorted(fam_pairs, key=lambda f: -len(fam_pairs[f]))
+json.dump({
+    "families": [[f, len({(x[0], x[1]) for x in fam_pairs[f]})] for f in fams],
+    # flat [s, d, airline, s, d, airline, ...] per family
+    "pairs": [[v for t in sorted(fam_pairs[f]) for v in t] for f in fams],
+}, open(os.path.join(out, "aircraft.json"), "w", encoding="utf-8"), separators=(",", ":"))
+print("aircraft families:", ", ".join(f"{f} ({len(fam_pairs[f])})" for f in fams))
 print(f"{len(used)} airports, {len(al_list)} airlines, {stats['routes']} routes; "
       f"{stats['routes_observed']} routes with flights seen over {len(days)} day(s); airline-routes: "
       f"{stats['airline_routes_observed']} seen, {stats['airline_routes_2014']} 2014 fallback, {stats['airline_routes_none']} no aircraft data")

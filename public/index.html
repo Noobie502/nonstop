@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <aside id="panel">
@@ -22,8 +22,8 @@
     </header>
 
     <div class="search">
-      <label for="q" class="sr">Search airport</label>
-      <input id="q" type="search" placeholder="Airport, city or airline (e.g. SIN, Qantas)" autocomplete="off" spellcheck="false">
+      <label for="q" class="sr">Search airports, airlines and aircraft</label>
+      <input id="q" type="search" placeholder="Airport, airline or aircraft (e.g. SIN, Qantas, A380)" autocomplete="off" spellcheck="false">
       <ul id="suggest" role="listbox" hidden></ul>
     </div>
 
@@ -32,6 +32,8 @@
       <div class="chips" id="hubs"></div>
       <p>…or map an airline's whole network:</p>
       <div class="chips" id="airline-chips"></div>
+      <p>…or see where an aircraft flies:</p>
+      <div class="chips" id="aircraft-chips"></div>
       <button id="random" class="ghost">🎲 Surprise me</button>
       <p class="tip">Tip: click any route line to see who flies it, flight numbers, takeoff times and aircraft.</p>
     </div>
@@ -60,7 +62,11 @@
         <div class="al-pick">
           <label for="al-filter" class="sr">Airline</label>
           <select id="al-filter"></select>
-          <button id="al-network" class="ghost" title="Map this airline's whole network">Network ↗</button>
+          <button id="al-network" class="ghost" title="Map the whole network of the selected airline or aircraft">Network ↗</button>
+        </div>
+        <div class="al-pick">
+          <label for="ac-filter" class="sr">Aircraft</label>
+          <select id="ac-filter" disabled><option value="">All aircraft</option></select>
         </div>
       </div>
 
@@ -82,7 +88,7 @@
         <div><b id="a-airports">0</b><span>airports</span></div>
         <div><b id="a-countries">0</b><span>countries</span></div>
       </div>
-      <p class="tip">Click an airport to see this airline's flights from there.</p>
+      <p class="tip" id="a-tip"></p>
       <div class="board-head"><span>APT</span><span>CITY</span><span class="r">ROUTES</span></div>
       <ol id="a-list" class="board"></ol>
     </section>
@@ -99,6 +105,6 @@
   <div id="loading">Loading the world's routes…</div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
