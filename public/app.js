@@ -70,7 +70,7 @@
   };
 
   // ---------- load ----------
-  fetch("data/world.json").then((r) => r.json()).then((world) => {
+  fetch("data/world.json?v=2").then((r) => r.json()).then((world) => {
     COPIES.forEach((off) => L.geoJSON(world, {
       renderer: landRenderer, interactive: false, pane: "land",
       coordsToLatLng: (c) => L.latLng(c[1], c[0] + off),
@@ -78,7 +78,7 @@
     }).addTo(map));
   }).catch(() => {});
 
-  fetch("data/network.json").then((r) => r.json()).then((data) => {
+  fetch("data/network.json?v=2").then((r) => r.json()).then((data) => {
     A = data.airports; AL = data.airlines; PL = data.planes; ROUTES = data.routes;
     A.forEach((a, i) => byCode.set(a[0], i));
     alPairs = AL.map(() => []);
