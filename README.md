@@ -1,4 +1,6 @@
-# ✈ Nonstop — where can I fly direct?
+# ✈ Where to fly direct
+
+Live at https://www.wheretoflydirect.com
 
 Pick any airport and see every nonstop destination on a map. Or search an airline to map its whole network. Click any route to see who flies it, the flight numbers seen this week, typical takeoff times and the aircraft used.
 

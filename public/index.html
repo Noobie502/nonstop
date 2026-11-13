@@ -3,24 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nonstop: where can I fly direct?</title>
+  <title>Where to fly direct: every nonstop flight on a map</title>
   <meta name="description" content="Pick any airport, airline or aircraft and see every nonstop route on a map, with the flights, takeoff times and aircraft seen this week.">
   <meta name="theme-color" content="#0e141b">
   <!-- everything is served from this site: no third-party code or fonts -->
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preload" href="vendor/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=10">
 </head>
-<body data-view="list">
+<body data-view="list" data-section="intro">
   <a class="skip" href="#q">Skip to search</a>
 
   <div id="panel">
     <header class="brand">
       <span class="plane" aria-hidden="true">✈</span>
       <div class="brand-text">
-        <h1><a href="#" id="home">Nonstop</a></h1>
-        <p>Where can I fly direct?</p>
+        <h1><a href="#" id="home">Where to fly direct</a></h1>
+        <p>Every nonstop flight on one map</p>
       </div>
       <details class="settings" id="settings">
         <summary><span aria-hidden="true">⚙</span> Settings</summary>
@@ -179,6 +179,7 @@
   </div>
 
   <div id="map" role="region" aria-label="Map of routes. Everything on the map is also listed in the panel."></div>
+  <button type="button" id="map-home" class="btn map-home"><span aria-hidden="true">←</span> Back to world map</button>
 
   <nav class="view-tabs" aria-label="Switch view">
     <button type="button" id="show-list" aria-pressed="true"><span aria-hidden="true">☰</span> List</button>
@@ -191,6 +192,6 @@
   <script src="va-init.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

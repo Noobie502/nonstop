@@ -3,7 +3,7 @@
   const HUBS = ["BKK", "SIN", "DXB", "LHR", "FRA", "IST", "ATL", "LAX", "SYD", "HND"];
   const AIRLINE_PICKS = ["TG", "SQ", "EK", "QF", "LH", "FR", "WN", "AK"];
   const AIRCRAFT_PICKS = ["Airbus A380", "Boeing 747", "Boeing 787 Dreamliner", "Airbus A350", "Airbus A220", "COMAC C919"];
-  const VER = 9;
+  const VER = 10;
   const R = 6371;
   const COPIES = [-360, 0, 360];
   const KEY = (s, d) => s * 10000 + d;
@@ -273,6 +273,7 @@
   // ---------- panel sections ----------
   function showSection(name, focus = true) {
     section = name;
+    document.body.dataset.section = name;   // shows the mobile "Back to world map" button away from the start screen
     ["intro", "detail", "network", "route"].forEach((s) => { $(s).hidden = s !== name; });
     if (focus) {
       const h = $(name).querySelector("h2");
@@ -291,7 +292,7 @@
     view = null;
     routeLayer.clearLayers(); routeLines = new Map();
     dimBase(0.65);
-    document.title = "Nonstop: where can I fly direct?";
+    document.title = "Where to fly direct: every nonstop flight on a map";
     showSection("intro", focus);
     if (focus) $("q").focus();
     REDUCED ? map.setView([25, 20], 2) : map.flyTo([25, 20], 2, { duration: 0.8 });
@@ -351,7 +352,7 @@
     const dests = ROUTES[i].map(([d, min, ...als]) => ({ i: d, a: A[d], km: Math.round(distKm(o, A[d])), min, als }));
     view = { mode: "airport", i, o, dests, family };
     lastRowCode = null;
-    document.title = `Nonstop flights from ${o[2]} (${o[0]})`;
+    document.title = `Nonstop flights from ${o[2]} (${o[0]}) · Where to fly direct`;
     $("o-code").textContent = o[0];
     $("o-title").textContent = `${o[2]} (${o[0]})`;
     $("o-sub").textContent = `${o[1]} · ${o[3]}`;
@@ -555,7 +556,7 @@
     const airports = [...perAirport].sort((x, y) => y[1] - x[1]);
     view = { mode: "network", ...cfg };
     lastRowCode = null;
-    document.title = `${cfg.title} route map · Nonstop`;
+    document.title = `${cfg.title} route map · Where to fly direct`;
 
     const badge = $("a-code");
     badge.textContent = cfg.badge;
@@ -666,7 +667,7 @@
     L.circleMarker(pts[0], { renderer: canvas, radius: 7, color: "#0b1015", weight: 2, fillColor: "#ffc164", fillOpacity: 1, interactive: false }).addTo(focusLayer);
     L.circleMarker(pts[pts.length - 1], { renderer: canvas, radius: 7, color: "#0b1015", weight: 2, fillColor: "#6fd8ff", fillOpacity: 1, interactive: false }).addTo(focusLayer);
     fitTo([pts[0], pts[pts.length - 1], pts[Math.floor(pts.length / 2)]], 7);
-    document.title = `${o[2]} to ${t[2]} nonstop · Nonstop`;
+    document.title = `${o[2]} to ${t[2]} nonstop · Where to fly direct`;
     fillRoute();
     showSection("route", focus);
     if (isMobile() && focus) setView("list");
@@ -760,6 +761,8 @@
     go("");
     if (isMobile()) setView("map");
   }));
+  // phones: the same "go to the world map" button, floating on the map itself
+  $("map-home").addEventListener("click", () => { go(""); setView("map"); });
 
   // Report an issue: open a GitHub issue pre-filled with what the person was looking at
   function reportUrl() {
@@ -770,7 +773,7 @@
       `**Data:** routes ${META.built || "?"}, flights ${days[0] || "?"} to ${days[days.length - 1] || "?"}`,
       `**Browser:** ${navigator.userAgent}`,
     ].join("\n");
-    const title = `Issue: ${document.title.replace(/ · Nonstop$/, "")}`;
+    const title = `Issue: ${document.title.replace(/ · Where to fly direct$/, "")}`;
     return `https://github.com/Noobie502/nonstop/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
   }
   const report = $("report");
