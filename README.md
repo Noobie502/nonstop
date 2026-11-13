@@ -27,6 +27,13 @@ How flights are derived from tracking (`scripts/observed.py`):
 - Flights airborne at midnight UTC are stitched across consecutive days.
 - Takeoff times are local to the departure airport. Gate departure is usually 10–25 minutes earlier.
 
+Data checks done on every build (`scripts/build_data.py` prints a report):
+- **Routes:** routes with no airline are dropped; duplicate entries merged; routes faster than any airliner over long distances are dropped (the source occasionally points at the wrong airport, e.g. a Myanmar route tagged with Noosa, Australia); impossible flight times are replaced by the return flight's time or an estimate; outbound/return times that disagree wildly (usually a time-zone slip) are averaged.
+- **Countries:** one everyday name per country (the source mixes "USA" and "United States", which broke the "international only" filter).
+- **Aircraft:** light aircraft, helicopters and business jets are ignored; an aircraft type is dropped if the route is beyond its range or it was a one-off mis-tag (e.g. a single Dash 8 sighting on a 787 route); one-day flights numbered 5000+ (charters, positioning) are skipped.
+- Flights whose radio call sign isn't a flight number (e.g. `RYR8HG`) are shown as call signs.
+- Takeoff times were spot-checked against published timetables (SQ 308, TG 916, TG 102): they match actual takeoff, 20–40 min after the timetable departure.
+
 Limits: coverage depends on volunteer receivers, so some regions (parts of Africa, Central Asia, oceans) have gaps; those routes fall back to 2014 aircraft data or show "not seen".
 
 ## Building the data

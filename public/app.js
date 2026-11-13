@@ -3,7 +3,7 @@
   const HUBS = ["BKK", "SIN", "DXB", "LHR", "FRA", "IST", "ATL", "LAX", "SYD", "HND"];
   const AIRLINE_PICKS = ["TG", "SQ", "EK", "QF", "LH", "FR", "WN", "AK"];
   const AIRCRAFT_PICKS = ["Airbus A380", "Boeing 747", "Boeing 787 Dreamliner", "Airbus A350", "Airbus A220", "COMAC C919"];
-  const VER = 5;
+  const VER = 7;
   const R = 6371;
   const COPIES = [-360, 0, 360];
   const KEY = (s, d) => s * 10000 + d;
@@ -470,7 +470,9 @@
     const list = $("list");
     list.innerHTML = "";
     if (!shown.length) {
-      list.innerHTML = `<li class="empty">No nonstop flights match. Try clearing the filters.</li>`;
+      list.innerHTML = dests.length
+        ? `<li class="empty">No nonstop flights match. Try clearing the filters.</li>`
+        : `<li class="empty">No departures are listed from this airport. Flights arrive here, but the route data doesn't include any leaving.</li>`;
       return;
     }
     const frag = document.createDocumentFragment();
@@ -698,7 +700,7 @@
         <button type="button" class="btn secondary" id="explore">Flights from ${esc(t[2])} →</button>
       </div>
       <h3>Airlines on this route (${info.als.length})</h3>
-      <p class="r-note">Takeoff times are local and come from planes tracked in the last ${days || 7} days. Leaving the gate is usually 10–25 minutes earlier.</p>
+      <p class="r-note">Times are when the plane actually took off (local time), from planes tracked in the last ${days || 7} days. The timetable departure is usually 20–40 minutes earlier, or more if the flight often runs late.</p>
       <div id="r-airlines"><p class="r-note" role="status">Loading flights…</p></div>`;
     $("explore").onclick = () => go(t[0]);
 
@@ -717,10 +719,11 @@
             <caption class="sr">${esc(a[0])} flights from ${esc(o[2])} to ${esc(t[2])} seen in the last ${days} days</caption>
             <thead><tr><th scope="col">Flight</th><th scope="col">Takes off</th><th scope="col">Aircraft</th><th scope="col">How often</th></tr></thead>
             <tbody>${data.map(([label, min, n, tys]) => `<tr>
-              <th scope="row" class="fn">${esc(label)}</th>
+              <th scope="row" class="fn">${label.endsWith("*") ? `${esc(label.slice(0, -1))}<small>call sign</small>` : esc(label)}</th>
               <td class="tm">${min >= 0 ? fmtTime(min) : "–"}</td>
               <td>${tys.map((x) => esc(types[x])).join(", ") || "–"}</td>
-              <td class="often">${often(n)}</td></tr>`).join("")}</tbody></table>`;
+              <td class="often">${often(n)}</td></tr>`).join("")}</tbody></table>
+            ${data.some(([label]) => label.endsWith("*")) ? `<p class="fl-note">A call sign is the name pilots use on the radio; the flight number on your ticket is different.</p>` : ""}`;
         } else if (src === 2) {
           body = `<p><span class="tag">2014 records</span> Not tracked this week. Aircraft used to be: ${data.map((x) => esc(types[x])).join(", ")}.</p>`;
         } else {
@@ -750,6 +753,25 @@
   }
 
   document.querySelectorAll(".back").forEach((b) => b.addEventListener("click", goBack));
+  document.querySelectorAll(".exit").forEach((b) => b.addEventListener("click", () => {
+    go("");
+    if (isMobile()) setView("map");
+  }));
+
+  // Report an issue: open a GitHub issue pre-filled with what the person was looking at
+  function reportUrl() {
+    const days = META.observedDays || [];
+    const body = [
+      "**What looks wrong?**", "", "(Describe the problem here: a missing route, a wrong time or aircraft, something that doesn't work…)", "",
+      "---", `**Page:** ${location.href}`, `**Showing:** ${document.title}`,
+      `**Data:** routes ${META.built || "?"}, flights ${days[0] || "?"} to ${days[days.length - 1] || "?"}`,
+      `**Browser:** ${navigator.userAgent}`,
+    ].join("\n");
+    const title = `Issue: ${document.title.replace(/ · Nonstop$/, "")}`;
+    return `https://github.com/Noobie502/nonstop/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  }
+  const report = $("report");
+  ["pointerdown", "focus", "click"].forEach((ev) => report.addEventListener(ev, () => { report.href = reportUrl(); }));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && section !== "intro" && !e.target.closest("#suggest, #q, .settings, select")) goBack();
   });

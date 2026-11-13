@@ -25,6 +25,65 @@ N = lambda v: None if v in ("\\N", "", "-", "N/A") else v
 R = json.load(open(routes_path, encoding="utf-8"))
 ap_ok = {k: a for k, a in R.items() if a.get("latitude") and a.get("longitude") and a.get("iata")}
 
+# One everyday name per country (the source mixes "USA"/"United States", official long forms, etc.)
+COUNTRY = {
+    "USA": "United States", "Macau SAR": "Macau", "Macao": "Macau", "Hong Kong SAR": "Hong Kong",
+    "Lao People's Democratic Republic": "Laos", "Democratic People's Republic of Korea": "North Korea",
+    "Republic of Korea": "South Korea", "Republic of Moldova": "Moldova", "Republic of Serbia": "Serbia",
+    "Republic of Yemen": "Yemen", "Syrian Arab Republic": "Syria", "Viet Nam": "Vietnam",
+    "The Democratic Republic of The Congo": "DR Congo", "Congo": "Republic of the Congo",
+    "United Republic of Tanzania": "Tanzania", "Brunei Darussalam": "Brunei", "East Timor": "Timor-Leste",
+    "Svalbard & Jan Mayen Island": "Svalbard", "Wallis and Futuna Islands": "Wallis and Futuna",
+    "Cote d'Ivoire": "Côte d'Ivoire", "Reunion": "Réunion", "Aland": "Åland", "Saint Barthelemy": "Saint Barthélemy",
+    "Turkiye": "Türkiye", "St. Helena": "Saint Helena", "St. Pierre and Miquelon": "Saint Pierre and Miquelon",
+    "St. Kitts and Nevis": "Saint Kitts and Nevis", "Czech Republic": "Czechia",
+}
+country = lambda a: COUNTRY.get(a.get("country") or "", a.get("country") or "")
+
+def gc_km(a, b):
+    import math
+    la1, lo1, la2, lo2 = map(math.radians, (float(a["latitude"]), float(a["longitude"]), float(b["latitude"]), float(b["longitude"])))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 2 * 6371 * math.asin(min(1, math.sqrt(h)))
+
+# Cleaned routes: (src, dst) -> {"min": scheduled minutes or 0 if unknown, "als": set of airline IATA}
+CR, clean_log = {}, Counter()
+for s_, a_ in ap_ok.items():
+    for r in a_.get("routes", []):
+        d_ = r.get("iata")
+        if d_ not in ap_ok or d_ == s_: continue
+        als_ = {c["iata"] for c in r.get("carriers", []) if c.get("iata")}
+        if not als_: clean_log["dropped: no airline listed"] += 1; continue
+        e = CR.setdefault((s_, d_), {"min": 0, "als": set()})
+        if e["als"]: clean_log["merged duplicate route entries"] += 1
+        e["als"] |= als_
+        m_ = int(r.get("min") or 0)
+        if m_ and (not e["min"] or m_ < e["min"]): e["min"] = m_
+speed = lambda k, m: k / (m / 60) if m else None
+plausible = lambda k, m: bool(m) and m <= 120 + k / 2 and (k < 50 or (speed(k, m) <= 1000 and (speed(k, m) >= 100 or k < 300)))  # short hops are mostly taxiing
+dropped_routes = []
+for (s_, d_), e in list(CR.items()):
+    k, m_ = gc_km(ap_ok[s_], ap_ok[d_]), e["min"]
+    if not m_: continue
+    v = speed(k, m_)
+    if v > 1000 and k > 2500:
+        # faster than any airliner over a long distance: the source points at the wrong airport
+        dropped_routes.append((s_, d_, round(k), m_)); del CR[(s_, d_)]; clean_log["dropped: impossible (wrong airport code in source)"] += 1
+for (s_, d_), e in CR.items():
+    k, m_ = gc_km(ap_ok[s_], ap_ok[d_]), e["min"]
+    if not m_ or plausible(k, m_): continue
+    back = CR.get((d_, s_))
+    e["fix"] = back["min"] if back and plausible(k, back["min"]) else 0  # 0 = show an estimate instead
+    clean_log["fixed: impossible flight time"] += 1
+for e in CR.values():
+    if "fix" in e: e["min"] = e.pop("fix")
+for (s_, d_), e in CR.items():
+    back = CR.get((d_, s_))
+    if s_ < d_ and back and e["min"] and back["min"] and abs(e["min"] - back["min"]) > max(75, 0.45 * min(e["min"], back["min"])):
+        # usually a time-zone slip in the source on one direction; the average cancels it out
+        e["min"] = back["min"] = round((e["min"] + back["min"]) / 2 / 5) * 5
+        clean_log["evened out: outbound/return times far apart"] += 1
+
 # ---------- OpenFlights: airline ICAO -> IATA, country; 2014 aircraft ----------
 icao2iata, iata_country = {}, {}
 for r in csv.reader(open(os.path.join(of_dir, "airlines.dat"), encoding="utf-8")):
@@ -56,6 +115,27 @@ def pretty_type(desc, code):
     s = s.replace("De Havilland Canada", "De Havilland")
     return s
 
+# Aircraft that don't fly scheduled airline routes (training, private and business flying)
+NOT_AIRLINE = re.compile(r"Piper|Cirrus|Diamond|Mooney|Robinson|Bell |Eurocopter|Helicopter|Agusta|Sikorsky|Learjet|Gulfstream|"
+                         r"Falcon|Challenger|Global \d|BD-700|Hawker|Phenom|Praetor|Legacy|PC-24|Thrush|Cherokee|Sailplane|"
+                         r"Bonanza|Baron|Beechjet|Premier|Honda|Hercules|C-130|Aztec|Navajo|Seminole|Tecnam|Cub|Citation|Beech 35|Beech 55|Beech 58", re.I)
+CESSNA_OK = re.compile(r"Cessna (208|402|404|408)|Caravan|SkyCourier|Businessliner", re.I)
+def airline_type(name):
+    if re.search(r"\bCessna\b", name, re.I) and not CESSNA_OK.search(name): return False
+    return not NOT_AIRLINE.search(name)
+# rough maximum range (km) by aircraft group, used to catch mis-tagged aircraft
+RANGES = [
+    (r"PC-12|Caravan|Cessna 4\d\d|King Air|Beech (1900|200|300|99)|Twin Otter|DHC-6|Islander|BN-2|Let L-410|Metro|Jetstream|EMB.?1[12]0|Y12|Dornier 228|Saab 340|SF340", 1300),
+    (r"ATR|Dash 8|DHC-8|Saab 2000|Dornier 328|Fokker 50|AN-24|AN-140|An-24|IL114|MA60|Xian", 2000),
+    (r"CRJ|Regional Jet|ERJ-1[34]5|EMB-1[34]5|ERJ-1[79]0-[12]00|ERJ-170|Embraer 1[79]\d|Avro|RJ\d|BAe 146|Fokker (70|100)|Superjet|ARJ", 5000),
+    (r"A220|ERJ-190-[34]00|E2", 7000),
+    (r"A31[89]|A32[01]|737|717|MD-8|MD-9|DC-9|C-?919|757", 8800),
+]
+def max_range(name):
+    for pat, r in RANGES:
+        if re.search(pat, name, re.I): return r
+    return 99999
+
 obs_files = sorted(glob.glob(os.path.join(obs_dir, "*.json")))
 type_desc = {}
 # (dep, arr, airline IATA) -> callsign -> {"days": set, "times": [local minutes], "types": Counter}
@@ -72,8 +152,7 @@ def tz(iata):
 icao_map = {k: [v] for k, v in icao2iata.items()}
 extra = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "airline_icao_extra.json")))
 icao_map.update({k: v for k, v in extra.items() if not k.startswith("_")})
-carriers_of = {(s, r["iata"]): {c["iata"] for c in r["carriers"]}
-               for s, a in R.items() for r in a.get("routes", [])}
+carriers_of = {k: e["als"] for k, e in CR.items()}
 label_iata = {}  # callsign -> IATA used for its flight-number label
 
 def resolve(deps, arrs, cs):
@@ -135,8 +214,22 @@ def typical_minute(ms):
     return int(round(statistics.median(adj))) % 1440
 
 def flight_label(cs):
+    """'THA661' -> 'TG 661'. Alphanumeric radio call signs (e.g. 'AUA3A') aren't flight numbers, so they keep a '*'."""
     m = re.match(r"^[A-Z]{3}(\d+)$", cs)
-    return f"{label_iata.get(cs, cs[:3])} {int(m.group(1))}" if m else cs
+    return f"{label_iata.get(cs, cs[:3])} {int(m.group(1))}" if m else cs + "*"
+
+def good_types(e, k):
+    """Aircraft types for one flight on a k-km route, dropping one-off mis-tags and aircraft that can't fly that far."""
+    top = e["types"].most_common(1)[0][1] if e["types"] else 0
+    out_ = []
+    for t, c in e["types"].most_common():
+        name = pretty_type(type_desc.get(t), t)
+        if not airline_type(name): stats_t["light/private aircraft"] += c; continue
+        if k > max_range(name) * 1.1: stats_t["beyond range"] += c; continue
+        if c < 2 and c < 0.25 * top: stats_t["one-off mis-tag"] += c; continue
+        out_.append((t, name))
+    return out_
+stats_t = Counter()
 
 # ---------- aircraft families for the filter (airliners only) ----------
 FAMILY_CODES = [
@@ -159,13 +252,14 @@ FAMILY_CODES = [
 FAMILY_OF = {c: name for name, codes in FAMILY_CODES for c in codes.split()}
 
 # ---------- assemble ----------
-used = sorted(k for k, a in ap_ok.items() if a.get("routes"))
+used = sorted({s for s, _ in CR} | {d for _, d in CR})
 idx = {a: i for i, a in enumerate(used)}
 al_names = {}
 for a in ap_ok.values():
     for r in a.get("routes", []):
-        for c in r["carriers"]:
-            al_names.setdefault(c["iata"], c["name"])
+        for c in r.get("carriers", []):
+            if c.get("iata"): al_names.setdefault(c["iata"], c["name"])
+al_names = {k: v for k, v in al_names.items() if any(k in e["als"] for e in CR.values())}
 al_list = sorted(al_names, key=lambda k: al_names[k])
 al_idx = {k: i for i, k in enumerate(al_list)}
 type_names, type_idx = [], {}
@@ -178,12 +272,11 @@ routes = [[] for _ in used]
 fam_pairs = defaultdict(set)  # family -> {(s, d, airline)}
 details = defaultdict(dict)
 stats = Counter()
-for s in used:
-    for r in ap_ok[s].get("routes", []):
-        d = r["iata"]
-        if d not in idx or d == s: continue
-        als = sorted({c["iata"] for c in r["carriers"]})
-        entry = [idx[d], int(r.get("min") or 0)] + [al_idx[a] for a in als]
+for (s, d), ce in sorted(CR.items()):
+        if d not in idx: continue
+        als = sorted(ce["als"])
+        k_route = gc_km(ap_ok[s], ap_ok[d])
+        entry = [idx[d], ce["min"]] + [al_idx[a] for a in als]
         routes[idx[s]].append(entry)
         stats["routes"] += 1
         # details: per airline -> [source, flights or fallback]
@@ -191,20 +284,26 @@ for s in used:
         any_obs = False
         for a in als:
             fl = seen.get((s, d, a))
+            rows = []
             if fl:
-                any_obs = True
-                rows = []
                 for cs, e in fl.items():
-                    rows.append([flight_label(cs), typical_minute(e["times"]), len(e["days"]),
-                                 [tix(pretty_type(type_desc.get(t), t)) for t, _ in e["types"].most_common(3)]])
+                    num = re.match(r"^[A-Z]{3}(\d+)$", cs)
+                    if num and int(num.group(1)) >= 5000 and len(e["days"]) == 1:
+                        stats_t["one-off charter/positioning flight"] += 1; continue  # not a bookable timetable flight
+                    gt = good_types(e, k_route)
+                    if not gt: continue  # only light/mis-tagged aircraft: not a real airline flight
+                    rows.append([flight_label(cs), typical_minute(e["times"]), len(e["days"]), [tix(n) for _, n in gt[:3]]])
+                    for t, _ in gt:
+                        if t in FAMILY_OF: fam_pairs[FAMILY_OF[t]].add((idx[s], idx[d], al_idx[a]))
+                if not rows:
+                    fl = None
+            if fl and rows:
+                any_obs = True
                 rows.sort(key=lambda x: (x[1] if x[1] >= 0 else 9999))
                 det.append([al_idx[a], 1, rows[:14]])
-                for e in fl.values():
-                    for t in e["types"]:
-                        if t in FAMILY_OF: fam_pairs[FAMILY_OF[t]].add((idx[s], idx[d], al_idx[a]))
                 stats["airline_routes_observed"] += 1
-            elif (s, d, a) in of2014:
-                det.append([al_idx[a], 2, [tix(n) for n in sorted(of2014[(s, d, a)])]])
+            elif any(k_route <= max_range(n) * 1.1 for n in of2014.get((s, d, a), ())):
+                det.append([al_idx[a], 2, [tix(n) for n in sorted(of2014[(s, d, a)]) if k_route <= max_range(n) * 1.1]])
                 stats["airline_routes_2014"] += 1
             else:
                 det.append([al_idx[a], 0, []])
@@ -221,7 +320,7 @@ meta = {
 }
 json.dump({
     "meta": meta,
-    "airports": [[a, ap_ok[a]["name"], ap_ok[a].get("city_name") or "", ap_ok[a].get("country") or "",
+    "airports": [[a, ap_ok[a]["name"], ap_ok[a].get("city_name") or "", country(ap_ok[a]),
                   round(float(ap_ok[a]["latitude"]), 4), round(float(ap_ok[a]["longitude"]), 4)] for a in used],
     "airlines": [[al_names[k], k, iata_country.get(k, "")] for k in al_list],
     "routes": routes,
@@ -236,6 +335,9 @@ json.dump({
     # flat [s, d, airline, s, d, airline, ...] per family
     "pairs": [[v for t in sorted(fam_pairs[f]) for v in t] for f in fams],
 }, open(os.path.join(out, "aircraft.json"), "w", encoding="utf-8"), separators=(",", ":"))
+print("route cleaning:", dict(clean_log))
+print("  dropped (wrong airport in source):", dropped_routes)
+print("aircraft observations removed:", dict(stats_t))
 print("aircraft families:", ", ".join(f"{f} ({len(fam_pairs[f])})" for f in fams))
 print(f"{len(used)} airports, {len(al_list)} airlines, {stats['routes']} routes; "
       f"{stats['routes_observed']} routes with flights seen over {len(days)} day(s); airline-routes: "
