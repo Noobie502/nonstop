@@ -4,6 +4,14 @@ Pick any airport and see every nonstop destination on a map. Or search an airlin
 
 **Stack:** plain HTML/CSS/JS + [Leaflet](https://leafletjs.com), a bundled [Natural Earth](https://www.naturalearthdata.com) world map (no tile service or API key), deployed as a static site on Vercel. Data refreshes weekly via GitHub Actions.
 
+## Accessibility
+
+- Everything on the map is also in the panel: lists are real buttons, route details are a readable page with proper tables, so the site works by keyboard and screen reader.
+- Search is an ARIA combobox (arrow keys + Enter); result counts are announced; focus moves to each new heading; Esc or the browser Back button goes back.
+- Text sized in rem (browser zoom works), WCAG AA contrast, visible focus rings, 44px touch targets, honours reduced-motion.
+- Settings for km/miles and 12/24-hour time (remembered per browser). On phones the list and map switch with tabs.
+- Checked with axe-core (WCAG 2.1 AA + best practices): no violations.
+
 ## Data
 
 | What | Source | Freshness |
