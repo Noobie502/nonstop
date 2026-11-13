@@ -3,7 +3,7 @@
   const HUBS = ["BKK", "SIN", "DXB", "LHR", "FRA", "IST", "ATL", "LAX", "SYD", "HND"];
   const AIRLINE_PICKS = ["TG", "SQ", "EK", "QF", "LH", "FR", "WN", "AK"];
   const AIRCRAFT_PICKS = ["Airbus A380", "Boeing 747", "Boeing 787 Dreamliner", "Airbus A350", "Airbus A220", "COMAC C919"];
-  const VER = 7;
+  const VER = 8;
   const R = 6371;
   const COPIES = [-360, 0, 360];
   const KEY = (s, d) => s * 10000 + d;

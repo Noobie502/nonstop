@@ -1,0 +1,15 @@
+Copyright (c) 2026 Noobie502. All rights reserved.
+
+This covers the original source code and design of the Nonstop site in this
+repository: public/index.html, public/style.css, public/app.js, scripts/ and
+.github/. No permission is granted to copy, modify, publish or distribute it,
+in whole or in part, without the copyright holder's written permission.
+
+The following are NOT covered by this notice and keep their own licences:
+
+  public/data/                 Route and flight data: Open Database License (ODbL) 1.0.
+                               See DATA-LICENSE.md.
+  public/vendor/leaflet-1.9.4/ Leaflet 1.9.4, BSD 2-Clause License (see its LICENSE file).
+  public/vendor/fonts/         Inter and JetBrains Mono, SIL Open Font License 1.1
+                               (see the LICENSE files in that folder).
+  public/data/world.json       Derived from Natural Earth (public domain).

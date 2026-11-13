@@ -6,11 +6,11 @@
   <title>Nonstop: where can I fly direct?</title>
   <meta name="description" content="Pick any airport, airline or aircraft and see every nonstop route on a map, with the flights, takeoff times and aircraft seen this week.">
   <meta name="theme-color" content="#0e141b">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="style.css?v=7">
+  <!-- everything is served from this site: no third-party code or fonts -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="vendor/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="vendor/leaflet-1.9.4/leaflet.css">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body data-view="list">
   <a class="skip" href="#q">Skip to search</a>
@@ -164,6 +164,7 @@
 
     <footer>
       <p id="data-date">Routes are updated every week.</p>
+      <p class="legal">© 2026 Noobie502. Site code all rights reserved. Route and flight data: <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL<span class="sr"> (opens in a new tab)</span></a>.</p>
       <div class="foot-row">
         <details class="about">
           <summary>About the data</summary>
@@ -186,7 +187,7 @@
   <div id="live" class="sr" aria-live="polite" aria-atomic="true"></div>
   <div id="loading" role="status">Loading the world's routes…</div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="app.js?v=7"></script>
+  <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
