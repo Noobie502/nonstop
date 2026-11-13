@@ -16,8 +16,12 @@ Pick any airport and see every nonstop destination on a map. Or search an airlin
 
 - No third-party code: Leaflet 1.9.4 and the fonts are served from `public/vendor/` (copied from npm), so nothing outside this site can run on the page.
 - `vercel.json` sets a Content-Security-Policy that only allows this site's own files, plus `nosniff`, referrer, permissions and anti-framing headers.
-- Data files can only be read by pages on nonstop-gamma.vercel.app (CORS + Cross-Origin-Resource-Policy). This stops other sites using them in their visitors' browsers; it can't stop someone downloading them directly.
+- Data files can only be read by pages on www.wheretoflydirect.com (the site itself) (CORS + Cross-Origin-Resource-Policy). This stops other sites using them in their visitors' browsers; it can't stop someone downloading them directly.
 - To test header changes, push to a branch first: Vercel builds a private preview.
+
+## Analytics
+
+Vercel Web Analytics (cookieless) counts page views. On the free plan it can't record button clicks, so outbound links go to `/go/prices/BKK-CNX` (or `/go/schedule/BKK-CNX/TG`), a tiny page on this site that forwards to Google Flights. Each visit there is a page view, so the Analytics "Pages" list shows clicks per route. `public/go.js` is also the one place to change if the links ever go to a booking partner.
 
 ## Licence
 

@@ -3,7 +3,7 @@
   const HUBS = ["BKK", "SIN", "DXB", "LHR", "FRA", "IST", "ATL", "LAX", "SYD", "HND"];
   const AIRLINE_PICKS = ["TG", "SQ", "EK", "QF", "LH", "FR", "WN", "AK"];
   const AIRCRAFT_PICKS = ["Airbus A380", "Boeing 747", "Boeing 787 Dreamliner", "Airbus A350", "Airbus A220", "COMAC C919"];
-  const VER = 8;
+  const VER = 9;
   const R = 6371;
   const COPIES = [-360, 0, 360];
   const KEY = (s, d) => s * 10000 + d;
@@ -679,7 +679,10 @@
     const km = Math.round(distKm(o, t));
     const back = pairMap.has(KEY(d, s));
     const days = (META.observedDays || []).length;
-    const gf = (extra = "") => `https://www.google.com/travel/flights?q=${encodeURIComponent(`Flights from ${o[0]} to ${t[0]}${extra}`)}`;
+    // Outbound links go through /go/… on this site, which forwards to Google Flights.
+    // Each visit there is counted as a page view, so analytics shows clicks per route (works on the free plan).
+    const goPrices = `/go/prices/${o[0]}-${t[0]}`;
+    const goSchedule = (a) => `/go/schedule/${o[0]}-${t[0]}/${encodeURIComponent(a[1] || "XX")}?al=${encodeURIComponent(a[0])}`;
     const focusAl = view && view.mode === "network" && view.kind === "airline" ? view.id : (view && view.mode === "airport" ? curAirline() : null);
     const fromAirport = view && view.mode === "airport" && view.i === s;
     $("r-back").textContent = fromAirport ? `← All flights from ${o[2]}` : view && view.mode === "network" ? `← Back to ${view.title}` : "← Back";
@@ -696,7 +699,7 @@
         <div><dt>Flights back</dt><dd>${back ? "Yes, nonstop" : "Not nonstop"}</dd></div>
       </dl>
       <div class="r-actions">
-        <a class="btn primary" href="${gf()}" target="_blank" rel="noopener">Check prices &amp; times<span class="sr"> on Google Flights (opens in a new tab)</span> ↗</a>
+        <a class="btn primary" href="${goPrices}" target="_blank" rel="noopener nofollow">Check prices &amp; times<span class="sr"> on Google Flights (opens in a new tab)</span> ↗</a>
         <button type="button" class="btn secondary" id="explore">Flights from ${esc(t[2])} →</button>
       </div>
       <h3>Airlines on this route (${info.als.length})</h3>
@@ -732,7 +735,7 @@
         return `<section class="al-card${al === focusAl ? " focus" : ""}" aria-label="${esc(a[0])}">
           <h4>${a[1] ? `<span class="al-code" aria-hidden="true">${esc(a[1])}</span>` : ""}${esc(a[0])}</h4>
           ${body}
-          <a class="sched" href="${gf(" on " + a[0])}" target="_blank" rel="noopener">${esc(a[0])} schedule<span class="sr"> on Google Flights (opens in a new tab)</span> ↗</a>
+          <a class="sched" href="${goSchedule(a)}" target="_blank" rel="noopener nofollow">${esc(a[0])} schedule<span class="sr"> on Google Flights (opens in a new tab)</span> ↗</a>
         </section>`;
       }).join("") || `<p class="r-note">No airline information for this route.</p>`;
     });

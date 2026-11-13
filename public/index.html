@@ -170,6 +170,7 @@
           <summary>About the data</summary>
           <p><b>Routes</b> come from <a href="https://github.com/Jonty/airline-route-data" target="_blank" rel="noopener">airline-route-data<span class="sr"> (opens in a new tab)</span></a>, which lists the airlines that operate each route (codeshares are left out).</p>
           <p><b>Flights, takeoff times and aircraft</b> come from planes tracked by volunteer radio receivers in the last week, via <a href="https://www.adsb.lol" target="_blank" rel="noopener">adsb.lol<span class="sr"> (opens in a new tab)</span></a> (ODbL). Some regions have few receivers, so a few routes show no flights. Older aircraft records are from <a href="https://openflights.org/data" target="_blank" rel="noopener">OpenFlights<span class="sr"> (opens in a new tab)</span></a> (2014).</p>
+          <p>We count visits and clicks anonymously with Vercel Web Analytics (no cookies, nothing that identifies you).</p>
           <p>Always check the airline or a booking site before you travel. Map: <a href="https://www.naturalearthdata.com" target="_blank" rel="noopener">Natural Earth<span class="sr"> (opens in a new tab)</span></a>.</p>
         </details>
         <a id="report" class="btn secondary report" href="https://github.com/Noobie502/nonstop/issues/new" target="_blank" rel="noopener"><span aria-hidden="true">⚑</span> Report an issue<span class="sr"> (opens GitHub in a new tab; needs a free GitHub account)</span></a>
@@ -187,7 +188,9 @@
   <div id="live" class="sr" aria-live="polite" aria-atomic="true"></div>
   <div id="loading" role="status">Loading the world's routes…</div>
 
+  <script src="va-init.js"></script>
+  <script defer src="/_vercel/insights/script.js"></script>
   <script src="vendor/leaflet-1.9.4/leaflet.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
