@@ -120,9 +120,14 @@ NOT_AIRLINE = re.compile(r"Piper|Cirrus|Diamond|Mooney|Robinson|Bell |Eurocopter
                          r"Falcon|Challenger|Global \d|BD-700|Hawker|Phenom|Praetor|Legacy|PC-24|Thrush|Cherokee|Sailplane|"
                          r"Bonanza|Baron|Beechjet|Premier|Honda|Hercules|C-130|Aztec|Navajo|Seminole|Tecnam|Cub|Citation|Beech 35|Beech 55|Beech 58", re.I)
 CESSNA_OK = re.compile(r"Cessna (208|402|404|408)|Caravan|SkyCourier|Businessliner", re.I)
+# Allowlist: makers/models that airlines actually fly (anything else, e.g. gliders or microlights, is ignored)
+AIRLINER = re.compile(r"Airbus(?! Helicopters)|Boeing|Embraer|Bombardier|Canadair|ATR|Aerospatiale|De Havilland|DHC-|Dash|Saab|Fokker|"
+                      r"McDonnell|Douglas|Comac|Sukhoi|Antonov|Ilyushin|Tupolev|Yakovlev|BAe|British Aerospace|Avro|Dornier|"
+                      r"Fairchild|Let L|Xian|Harbin|Beech(craft)? 1900|King Air|Caravan|Cessna 4\d\d|SkyCourier|PC-12|"
+                      r"Britten-Norman|Islander|Trislander|Twin Otter|Beaver|Jetstream|Metro|Swearingen|Convair|Mitsubishi|Tecnam P-?2012", re.I)
 def airline_type(name):
     if re.search(r"\bCessna\b", name, re.I) and not CESSNA_OK.search(name): return False
-    return not NOT_AIRLINE.search(name)
+    return bool(AIRLINER.search(name)) and not NOT_AIRLINE.search(name)
 # rough maximum range (km) by aircraft group, used to catch mis-tagged aircraft
 RANGES = [
     (r"PC-12|Caravan|Cessna 4\d\d|King Air|Beech (1900|200|300|99)|Twin Otter|DHC-6|Islander|BN-2|Let L-410|Metro|Jetstream|EMB.?1[12]0|Y12|Dornier 228|Saab 340|SF340", 1300),
@@ -302,8 +307,8 @@ for (s, d), ce in sorted(CR.items()):
                 rows.sort(key=lambda x: (x[1] if x[1] >= 0 else 9999))
                 det.append([al_idx[a], 1, rows[:14]])
                 stats["airline_routes_observed"] += 1
-            elif any(k_route <= max_range(n) * 1.1 for n in of2014.get((s, d, a), ())):
-                det.append([al_idx[a], 2, [tix(n) for n in sorted(of2014[(s, d, a)]) if k_route <= max_range(n) * 1.1]])
+            elif any(airline_type(n) and k_route <= max_range(n) * 1.1 for n in of2014.get((s, d, a), ())):
+                det.append([al_idx[a], 2, [tix(n) for n in sorted(of2014[(s, d, a)]) if airline_type(n) and k_route <= max_range(n) * 1.1]])
                 stats["airline_routes_2014"] += 1
             else:
                 det.append([al_idx[a], 0, []])

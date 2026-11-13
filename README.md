@@ -12,6 +12,17 @@ Pick any airport and see every nonstop destination on a map. Or search an airlin
 - Settings for km/miles and 12/24-hour time (remembered per browser). On phones the list and map switch with tabs.
 - Checked with axe-core (WCAG 2.1 AA + best practices): no violations.
 
+## Security
+
+- No third-party code: Leaflet 1.9.4 and the fonts are served from `public/vendor/` (copied from npm), so nothing outside this site can run on the page.
+- `vercel.json` sets a Content-Security-Policy that only allows this site's own files, plus `nosniff`, referrer, permissions and anti-framing headers.
+- Data files can only be read by pages on nonstop-gamma.vercel.app (CORS + Cross-Origin-Resource-Policy). This stops other sites using them in their visitors' browsers; it can't stop someone downloading them directly.
+- To test header changes, push to a branch first: Vercel builds a private preview.
+
+## Licence
+
+Site code: © 2026 Noobie502, all rights reserved (`LICENSE`). Built data in `public/data/`: ODbL 1.0 (`DATA-LICENSE.md`). Leaflet (BSD-2) and the fonts (OFL) keep their own licences.
+
 ## Data
 
 | What | Source | Freshness |
